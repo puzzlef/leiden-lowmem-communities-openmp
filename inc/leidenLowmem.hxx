@@ -160,7 +160,7 @@ inline auto leidenLowmemChooseCommunity(const G& x, K u, K d, const vector<W>& v
  * @returns iterations performed (0 if converged already)
  */
 template <bool REFINE=false, class G, class K, class W, class B, class FC, class FA, class FB, class FH>
-inline int leidenMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa, FB fb, FH fh) {
+inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa, FB fb, FH fh) {
   size_t S = x.span();
   int l = 0;
   W  el = W();
@@ -479,37 +479,6 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
     delete vs[t];
   }
   return LeidenResult<K>(ucom, utot, ctot, cdwt, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ts/o.repeat, tr/o.repeat, ta/o.repeat, tt/o.repeat, countValueOmp(vaff, B(1)));
-}
-#pragma endregion
-
-
-
-
-#pragma region REPEAT SETUP (DYNAMIC)
-/**
- * Setup the Dynamic Leiden algorithm for multiple runs.
- * @param qs initial community membership for each run (updated)
- * @param qvtots initial total vertex weights for each run (updated)
- * @param qctots initial total community weights for each run (updated)
- * @param qcdwts initial change in total weight of each community for each run (updated)
- * @param q initial community membership
- * @param qvtot initial total vertex weights
- * @param qctot initial total community weights
- * @param qcdwt initial change in total weight of each community
- * @param repeat number of runs
- */
-template <class K, class W>
-inline void leidenSetupInitialsW(vector2d<K>& qs, vector2d<W>& qvtots, vector2d<W>& qctots, vector2d<W>& qcdwts, const vector<K>& q, const vector<W>& qvtot, const vector<W>& qctot, const vector<W>& qcdwt, int repeat) {
-  qs    .resize(repeat);
-  qvtots.resize(repeat);
-  qctots.resize(repeat);
-  qcdwts.resize(repeat);
-  for (int r=0; r<repeat; ++r) {
-    qs[r]     = q;
-    qvtots[r] = qvtot;
-    qctots[r] = qctot;
-    qcdwts[r] = qcdwt;
-  }
 }
 #pragma endregion
 

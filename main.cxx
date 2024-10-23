@@ -40,41 +40,111 @@ inline double getModularity(const G& x, const R& a, double M) {
 }
 
 
-template <class K, class W>
-inline float refinementTime(const LouvainResult<K, W>& a) {
-  return 0;
-}
-template <class K, class W>
-inline float refinementTime(const LeidenResult<K, W>& a) {
-  return a.refinementTime;
-}
-
-
 
 
 // PERFORM EXPERIMENT
 // ------------------
+
+template <size_t NUM_SLOTS, class G>
+inline auto runLeidenLowmem(const G& x, int repeat) {
+  auto fh = [](auto c) { return c % NUM_SLOTS; };
+  return leidenLowmemStaticOmp(x, {repeat, NUM_SLOTS}, fh);
+}
+
 
 template <class G>
 void runExperiment(const G& x) {
   int repeat = REPEAT_METHOD;
   double   M = edgeWeightOmp(x)/2;
   // Follow a specific result logging format, which can be easily parsed later.
-  auto flog = [&](const auto& ans, const char *technique) {
+  auto flog = [&](const auto& ans, const char *technique, size_t numSlots=0) {
     printf(
-      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %.3e aff, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
-      ans.time, ans.markingTime, ans.initializationTime, ans.firstPassTime, ans.localMoveTime, refinementTime(ans), ans.aggregationTime,
-      double(ans.affectedVertices), ans.iterations, ans.passes, getModularity(x, ans, M),
-      countValue(communitiesDisconnectedOmp(x, ans.membership), char(1)),
-      communities(x, ans.membership).size(), technique
+      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %.3e slots, %04d iters, %03d passes, %01.9f modularity} %s\n",
+      ans.time, ans.markingTime, ans.initializationTime, ans.firstPassTime, ans.localMoveTime, ans.refinementTime, ans.aggregationTime,
+      double(numSlots), ans.iterations, ans.passes, getModularity(x, ans, M), technique
     );
   };
   // Get community memberships on original graph (static).
   {
-    auto a0 = louvainStaticOmp(x, {repeat});
-    flog(a0, "louvainStaticOmp");
     auto b0 = leidenStaticOmp(x, {repeat});
     flog(b0, "leidenStaticOmp");
+  }
+  // Get community memberships on original graph (low memory).
+  {
+    auto b1 = runLeidenLowmem<(1 << 28)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp28", 1 << 28);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 27)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp27", 1 << 27);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 26)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp26", 1 << 26);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 25)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp25", 1 << 25);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 24)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp24", 1 << 24);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 23)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp23", 1 << 23);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 22)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp22", 1 << 22);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 21)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp21", 1 << 21);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 20)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp20", 1 << 20);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 19)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp19", 1 << 19);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 18)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp18", 1 << 18);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 17)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp17", 1 << 17);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 16)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp16", 1 << 16);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 15)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp15", 1 << 15);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 14)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp14", 1 << 14);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 13)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp13", 1 << 13);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 12)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp12", 1 << 12);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 11)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp11", 1 << 11);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 << 10)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp10", 1 << 10);
   }
 }
 
