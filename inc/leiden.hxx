@@ -981,6 +981,7 @@ inline auto leidenInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA
   using  K = typename G::key_type;
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = char;
+  // printf("leidenInvokeOmp(): Eat starters\n");
   // Options.
   double R = o.resolution;
   int    L = o.maxIterations, l = 0;
@@ -1140,6 +1141,7 @@ inline auto leidenInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA
     delete us[t];
     delete vs[t];
   }
+  // printf("leidenInvokeOmp(): Eat deserts\n");
   return LeidenResult<K>(ucom, utot, ctot, cdwt, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ts/o.repeat, tr/o.repeat, ta/o.repeat, tt/o.repeat, countValueOmp(vaff, B(1)));
 }
 #pragma endregion
