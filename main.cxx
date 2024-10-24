@@ -146,6 +146,42 @@ void runExperiment(const G& x) {
     auto b1 = runLeidenLowmem<(1 << 10)>(x, repeat);
     flog(b1, "leidenLowmemStaticOmp10", 1 << 10);
   }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  9)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp09", 1 <<  9);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  8)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp08", 1 <<  8);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  7)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp07", 1 <<  7);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  6)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp06", 1 <<  6);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  5)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp05", 1 <<  5);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  4)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp04", 1 <<  4);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  3)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp03", 1 <<  3);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  2)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp02", 1 <<  2);
+  }
+  {
+    auto b1 = runLeidenLowmem<(1 <<  1)>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmp01", 1 <<  1);
+  }
 }
 
 
