@@ -271,7 +271,7 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
       leidenLowmemScanCommunitiesW<true>(*vcs[t], *vcout[t], x, u, vcom, fh);
     });
     for (auto d : *vcs[t])
-      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, (*vcout[t])[d]);
+      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, (*vcout[t])[fh(d)]);
   }
 }
 
