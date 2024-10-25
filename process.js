@@ -5,8 +5,7 @@ const path = require('path');
 const ROMPTH = /^OMP_NUM_THREADS=(\d+)/;
 const RGRAPH = /^Loading graph .*\/(.*?)\.mtx \.\.\./m;
 const RORDER = /^order: (\d+) size: (\d+) (?:\[\w+\] )?\{\}/m;
-const RRESLT = /^\{(.+?)ms, (.+?)ms mark, (.+?)ms init, (.+?)ms firstpass, (.+?)ms locmove, (.+?)ms refine, (.+?)ms aggr, (.+?) aff, (.+?) iters, (.+?) passes, (.+?) modularity, (.+?)\/(.+?) disconnected\} (.+)/m;
-
+const RRESLT = /^\{(.+?)ms, (.+?)ms mark, (.+?)ms init, (.+?)ms firstpass, (.+?)ms locmove, (.+?)ms refine, (.+?)ms aggr, (.+?) slots, (.+?) iters, (.+?) passes, (.+?) modularity\} (.+)/m;
 
 
 
@@ -60,7 +59,7 @@ function readLogLine(ln, data, state) {
     state.size  = parseFloat(size);
   }
   else if (RRESLT.test(ln)) {
-    var [, time, marking_time, initialization_time, first_pass_time, local_moving_phase_time, refinement_phase_time, aggregation_phase_time, affected_vertices, iterations, passes, modularity, disconnected_communities, total_communities, technique] = RRESLT.exec(ln);
+    var [, time, marking_time, initialization_time, first_pass_time, local_moving_phase_time, refinement_phase_time, aggregation_phase_time, number_of_slots, iterations, passes, modularity, technique] = RRESLT.exec(ln);
     data.get(state.graph).push(Object.assign({}, state, {
       time:        parseFloat(time),
       marking_time:            parseFloat(marking_time),
@@ -69,12 +68,10 @@ function readLogLine(ln, data, state) {
       local_moving_phase_time: parseFloat(local_moving_phase_time),
       refinement_phase_time:   parseFloat(refinement_phase_time),
       aggregation_phase_time:  parseFloat(aggregation_phase_time),
-      affected_vertices:       parseFloat(affected_vertices),
+      number_of_slots:         parseFloat(number_of_slots),
       iterations:  parseFloat(iterations),
       passes:      parseFloat(passes),
       modularity:  parseFloat(modularity),
-      disconnected_communities: parseFloat(disconnected_communities),
-      total_communities:        parseFloat(total_communities),
       technique,
     }));
   }
