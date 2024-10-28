@@ -1,7 +1,5 @@
 #pragma once
 #include <utility>
-#include <limits>
-#include <tuple>
 #include <vector>
 #include <algorithm>
 #include <omp.h>
@@ -9,17 +7,11 @@
 #include "Graph.hxx"
 #include "properties.hxx"
 #include "csr.hxx"
-#include "bfs.hxx"
 #include "leiden.hxx"
 
-using std::numeric_limits;
-using std::tuple;
 using std::vector;
 using std::make_pair;
-using std::move;
 using std::swap;
-using std::get;
-using std::min;
 using std::max;
 
 
@@ -314,7 +306,7 @@ inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vec
  * @param fh hash function mapping community to index
  * @returns leiden result
  */
-template <bool DYNAMIC=false, bool SELSPLIT=false, int CHUNK_SIZE=2048, class G, class FI, class FM, class FA, class FH>
+template <class G, class FI, class FM, class FA, class FH>
 inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa, FH fh) {
   using  K = typename G::key_type;
   using  W = LEIDEN_WEIGHT_TYPE;
@@ -329,35 +321,15 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   double M = edgeWeightOmp(x)/2;
   // Allocate buffers.
   int    T = omp_get_max_threads();
-  vector<B> vaff(S);        // Affected vertex flag (any pass)
-  vector<B> cchg, cspt(S);  // Community changed/split flag (first pass)
-  vector<B> bufb;           // Buffer for splitting communities
-  vector<K> bufc;           // Buffer for obtaining a vertex from each community
-  vector<K> ucom, vcom(S);  // Community membership (first pass, current pass)
-  vector<K> udom, vcob(S);  // Old community membership (first pass), Community bound (any pass)
-  vector<W> utot, vtot(S);  // Total vertex weights (first pass, current pass)
-  vector<W> ctot, dtot;     // Total community weights (any pass)
-  vector<W> cdwt;           // Change in total weight of each community
-  vector<K> bufk(T);        // Buffer for exclusive scan
-  vector<size_t> bufs(T);   // Buffer for exclusive scan
+  vector<B> vaff(S);            // Affected vertex flag (any pass)
+  vector<K> ucom(S), vcom(S);   // Community membership (first pass, current pass)
+  vector<K> vcob(S);            // Old community membership (first pass), Community bound (any pass)
+  vector<W> utot(S), vtot(S);   // Total vertex weights (first pass, current pass)
+  vector<W> ctot(S);            // Total community weights (any pass)
+  vector<K> bufk(T);            // Buffer for exclusive scan
+  vector<size_t> bufs(T);       // Buffer for exclusive scan
   vector<vector<K>*> vcs(T);    // Hashtable keys
   vector<vector<W>*> vcout(T);  // Hashtable values
-  vector<vector<K>*> us(T), vs(T);  // BFS scratch space
-  for (int t=0; t<T; ++t) {
-    us[t] = new vector<K>();
-    vs[t] = new vector<K>();
-    us[t]->reserve(S);
-    vs[t]->reserve(S);
-  }
-  if (!DYNAMIC) ucom.resize(S);
-  if (!DYNAMIC) utot.resize(S);
-  if (!DYNAMIC) ctot.resize(S);
-  if (!DYNAMIC) cdwt.resize(S);
-  if ( DYNAMIC) udom.resize(S);
-  if ( DYNAMIC) cchg.resize(S);
-  if ( DYNAMIC) bufb.resize(S);
-  if ( DYNAMIC) bufc.resize(S);
-  if ( DYNAMIC) dtot.resize(S);
   leidenAllocateHashtablesW(vcs, vcout, o.numSlots);
   size_t Z = max(size_t(o.aggregationTolerance * X), X);
   size_t Y = max(size_t(o.aggregationTolerance * Z), Z);
@@ -365,36 +337,30 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   DiGraphCsr<K, None, W> y(S, Y);         // CSR for aggregated graph (input);  y(S, X)
   DiGraphCsr<K, None, W> z(S, Z);         // CSR for aggregated graph (output); z(S, X)
   // Perform Leiden algorithm.
-  float tm = 0, ti = 0, tp = 0, tl = 0, ts = 0, tr = 0, ta = 0, tt = 0;  // Time spent in different phases
+  float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0;  // Time spent in different phases
   float t  = measureDurationMarked([&](auto mark) {
     double E  = o.tolerance;
     auto   fc = [&](double el, int l) { return el<=E; };
     // Reset buffers, in case of multiple runs.
     fillValueOmpU(vaff, B());
-    fillValueOmpU(cchg, B());
-    fillValueOmpU(cspt, B());
     fillValueOmpU(ucom, K());
     fillValueOmpU(vcom, K());
-    fillValueOmpU(udom, K());
     fillValueOmpU(vcob, K());
     fillValueOmpU(utot, W());
     fillValueOmpU(vtot, W());
     fillValueOmpU(ctot, W());
-    fillValueOmpU(cdwt, W());
     cv.respan(S);
     y .respan(S);
     z .respan(S);
     // Time the algorithm.
     mark([&]() {
-      size_t CCHG = 0;
       // Initialize community membership and total vertex/community weights.
       ti += measureDuration([&]() {
-        fi(ucom, utot, ctot, cdwt);
-        if (DYNAMIC) copyValuesOmpW(udom, ucom);
+        fi(ucom, utot, ctot);
       });
       // Mark affected vertices.
       tm += measureDuration([&]() {
-        CCHG = fm(vaff, cchg, cspt, cdwt, vcs, vcout, ucom, utot, ctot);
+        fm(vaff, vcs, vcout, ucom, utot, ctot);
       });
       // Start timing first pass.
       auto t0 = timeNow(), t1 = t0;
@@ -406,38 +372,21 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
         bool isFirst = p==0;
         int m = 0;
         tl += measureDuration([&]() {
-          auto fb = [&](auto c) { if (SELSPLIT) cspt[c] = B(1); };
-          if (isFirst) m += leidenLowmemMoveOmpW(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fa, fb, fh);
+          if (isFirst) m += leidenLowmemMoveOmpW(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fa, fh);
           else         m += leidenLowmemMoveOmpW(vcom, ctot, vaff, vcs, vcout, y, vcob, vtot, M, R, L, fc, fh);
         });
-        size_t CSPT = SELSPLIT && isFirst? countValueOmp(cspt, B(1)) : 0;
-        // Adjust community IDs.
-        if (DYNAMIC && isFirst && (CSPT || CCHG)) {
-          swap(ctot, dtot); swap(ucom, vcob); swap(cchg, vaff); swap(cspt, bufb);
-          leidenSubsetRenameCommunitiesOmpW<SELSPLIT>(ucom, ctot, cchg, cspt, bufc, x, vcob, dtot, vaff, bufb);
-        }
-        ts += measureDuration([&]() {
-          if (DYNAMIC && isFirst && (!SELSPLIT || CSPT)) {
-            auto fs = [&](auto c) { return (!SELSPLIT || cspt[c]) && !cchg[c]; };
-            splitDisconnectedCommunitiesBfsOmpW(vcom, bufb, vaff, us, vs, x, ucom, fs);
-            swap(ucom, vcom);
-          }
-        });
         tr += measureDuration([&]() {
-          if (!isFirst || !DYNAMIC || CCHG) {
-            auto fr = [&](auto u) { return DYNAMIC? cchg[vcob[u]] : B(1); };
-            if (isFirst) copyValuesOmpW(vcob.data(), ucom.data(), x.span());  // swap(vcob, ucom);
-            else         copyValuesOmpW(vcob.data(), vcom.data(), y.span());  // swap(vcob, vcom);
-            if (isFirst) leidenInitializeOmpW(ucom, ctot, x, utot, fr);
-            else         leidenInitializeOmpW(vcom, ctot, y, vtot);
-            // if (isFirst) fillValueOmpU(vaff.data(), x.order(), B(1));
-            // else         fillValueOmpU(vaff.data(), y.order(), B(1));
-            if (isFirst) m += leidenLowmemMoveOmpW<true>(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fr, fh);
-            else         m += leidenLowmemMoveOmpW<true>(vcom, ctot, vaff, vcs, vcout, y, vcob, vtot, M, R, L, fc, fh);
-          }
+          if (isFirst) copyValuesOmpW(vcob.data(), ucom.data(), x.span());  // swap(vcob, ucom);
+          else         copyValuesOmpW(vcob.data(), vcom.data(), y.span());  // swap(vcob, vcom);
+          if (isFirst) leidenInitializeOmpW(ucom, ctot, x, utot);
+          else         leidenInitializeOmpW(vcom, ctot, y, vtot);
+          // if (isFirst) fillValueOmpU(vaff.data(), x.order(), B(1));
+          // else         fillValueOmpU(vaff.data(), y.order(), B(1));
+          if (isFirst) m += leidenLowmemMoveOmpW<true>(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fh);
+          else         m += leidenLowmemMoveOmpW<true>(vcom, ctot, vaff, vcs, vcout, y, vcob, vtot, M, R, L, fc, fh);
         });
         l += max(m, 1); ++p;
-        if ((m<=1 || p>=P) && (!isFirst || !CCHG)) break;
+        if (m<=1 || p>=P) break;
         size_t GN = isFirst? x.order() : y.order();
         size_t CN = 0;
         if (isFirst) CN = leidenCommunityExistsOmpW(cv.degrees, x, ucom);
@@ -451,8 +400,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
           cv.respan(CN); z.respan(CN);
           if (isFirst) leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
           else         leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
-          if (isFirst) leidenLowmemAggregateOmpW<CHUNK_SIZE>(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys, fh);
-          else         leidenLowmemAggregateOmpW<CHUNK_SIZE>(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys, fh);
+          if (isFirst) leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys, fh);
+          else         leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys, fh);
         });
         swap(y, z);
         // fillValueOmpU(vcob.data(), CN, K());
@@ -468,17 +417,10 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
       else      leidenLookupCommunitiesOmpU(ucom, vcom);
       if (p<=1) t1 = timeNow();
       tp += duration(t0, t1);
-      tt += measureDuration([&]() {
-        if (DYNAMIC) leidenTrackCommunitiesOmpU(ucom, bufc, vtot, vcob, dtot, x, udom, utot);
-      });
     });
   }, o.repeat);
   leidenFreeHashtablesW(vcs, vcout);
-  for (int t=0; t<T; ++t) {
-    delete us[t];
-    delete vs[t];
-  }
-  return LeidenResult<K>(ucom, utot, ctot, cdwt, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, ts/o.repeat, tr/o.repeat, ta/o.repeat, tt/o.repeat, countValueOmp(vaff, B(1)));
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat);
 }
 #pragma endregion
 
@@ -498,14 +440,12 @@ template <class G, class FH>
 inline auto leidenLowmemStaticOmp(const G& x, const LeidenOptions& o, FH fh) {
   using B = char;
   using W = LEIDEN_WEIGHT_TYPE;
-  auto fi = [&](auto& vcom, auto& vtot, auto& ctot, auto& cdwt) {
+  auto fi = [&](auto& vcom, auto& vtot, auto& ctot) {
     leidenVertexWeightsOmpW(vtot, x);
     leidenInitializeOmpW(vcom, ctot, x, vtot);
-    fillValueOmpU(cdwt, W());
   };
-  auto fm = [ ](auto& vaff, auto& cchg, auto& cspt, auto& cdwt, auto& vcs, auto& vcout, const auto& vcom, const auto& vtot, const auto& ctot) {
+  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom, const auto& vtot, const auto& ctot) {
     fillValueOmpU(vaff, B(1));
-    return size_t(1);
   };
   auto fa = [ ](auto u) { return true; };
   return leidenLowmemInvokeOmp(x, o, fi, fm, fa, fh);
