@@ -27,8 +27,6 @@ struct LeidenOptions {
   #pragma region DATA
   /** Number of times to repeat the algorithm [1]. */
   int repeat;
-  /** Number of slots in each hashtable [0]. */
-  size_t numSlots;
   /** Resolution parameter for modularity [1]. */
   double resolution;
   /** Tolerance for convergence [1e-2]. */
@@ -55,8 +53,8 @@ struct LeidenOptions {
    * @param maxIterations maximum number of iterations per pass [20]
    * @param maxPasses maximum number of passes [10]
    */
-  LeidenOptions(int repeat=1, size_t numSlots=0, double resolution=1, double tolerance=1e-2, double aggregationTolerance=0.8, double toleranceDrop=10, int maxIterations=20, int maxPasses=10) :
-  repeat(repeat), numSlots(numSlots), resolution(resolution), tolerance(tolerance), aggregationTolerance(aggregationTolerance), toleranceDrop(toleranceDrop), maxIterations(maxIterations), maxPasses(maxPasses) {}
+  LeidenOptions(int repeat=1, double resolution=1, double tolerance=1e-2, double aggregationTolerance=0.8, double toleranceDrop=10, int maxIterations=20, int maxPasses=10) :
+  repeat(repeat), resolution(resolution), tolerance(tolerance), aggregationTolerance(aggregationTolerance), toleranceDrop(toleranceDrop), maxIterations(maxIterations), maxPasses(maxPasses) {}
   #pragma endregion
 };
 

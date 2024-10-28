@@ -9,6 +9,7 @@
 # source scl_source enable gcc-toolset-11
 # module load hpcx-2.7.0/hpcx-ompi
 # module load openmpi/4.1.5
+source /opt/rh/gcc-toolset-13/enable
 src="leiden-lowmem-communities-openmp"
 out="$HOME/Logs/$src$1.log"
 ulimit -s unlimited
@@ -34,7 +35,7 @@ DEFINES=(""
 )
 
 # Compile
-g++ ${DEFINES[*]} -std=c++17 -O3 -fopenmp main.cxx  # -Wall -Wno-unknown-pragmas
+g++ ${DEFINES[*]} -std=c++17 -O3 -mavx -fopenmp main.cxx  # -Wall -Wno-unknown-pragmas
 
 # Run on each graph
 runEach() {

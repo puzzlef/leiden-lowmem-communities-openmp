@@ -1,5 +1,6 @@
 #pragma once
 #include <utility>
+#include <array>
 #include <vector>
 #include <algorithm>
 #include <omp.h>
@@ -9,6 +10,7 @@
 #include "csr.hxx"
 #include "leiden.hxx"
 
+using std::array;
 using std::vector;
 using std::make_pair;
 using std::swap;
@@ -18,113 +20,245 @@ using std::max;
 
 
 #pragma region METHODS
+#pragma region HASHTABLES
+/**
+ * Allocate a number of hashtables.
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
+ */
+template <class K, class V, size_t SLOTS>
+inline void leidenLowmemAllocateHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws) {
+  size_t N = mcs.size();
+  for (size_t i=0; i<N; ++i) {
+    mcs[i] = new array<K, SLOTS>();
+    mws[i] = new array<V, SLOTS>();
+  }
+}
+
+
+/**
+ * Free a number of hashtables.
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
+ */
+template <class K, class V, size_t SLOTS>
+inline void leidenLowmemFreeHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws) {
+  size_t N = mcs.size();
+  for (size_t i=0; i<N; ++i) {
+    delete mcs[i];
+    delete mws[i];
+  }
+}
+#pragma endregion
+
+
+
+
 #pragma region CHANGE COMMUNITY
 /**
  * Scan an edge community connected to a vertex.
- * @param vcs communities vertex u is linked to (updated)
- * @param vcout total edge weight from vertex u to community C (updated)
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
  * @param u given vertex
  * @param v outgoing edge vertex
  * @param w outgoing edge weight
  * @param vcom community each vertex belongs to
  * @param vcob community bound each vertex belongs to
- * @param fh hash function mapping community to index
  */
-template <bool SELF=false, bool REFINE=false, class K, class V, class W, class FH>
-inline void leidenLowmemScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom, const vector<K>& vcob, FH fh) {
+template <bool SELF=false, bool REFINE=false, class K, class V, size_t SLOTS>
+inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, K u, K v, V w, const vector<K>& vcom, const vector<K>& vcob) {
   if (!SELF && u==v) return;
   if (REFINE && vcob[u]!=vcob[v]) return;
   K c = vcom[v];
-  if (!vcout[fh(c)]) vcs.push_back(c);
-  vcout[fh(c)] += w;
+  // Add edge weight to community.
+  for (int i=0; i<SLOTS; ++i)
+    mws[i] += mcs[i]==c? w : V();
+  // Check if community is already in the list.
+  int has = 0;
+  for (int i=0; i<SLOTS; ++i)
+    has |= mcs[i]==c? -1 : 0;
+  if (has) return;
+  // Find empty slot.
+  int f = -1;
+  for (int i=0; i<SLOTS; ++i)
+    if (mws[i]==V()) f = i;
+  // Add community to list.
+  if (f>=0) {
+    mcs[f] = c;
+    mws[f] = w;
+  }
+  // Subtract edge weight from non-matching communities.
+  else {
+    for (int i=0; i<SLOTS; ++i)
+      mws[i] = max(mws[i] - w, V());
+  }
 }
 
 
 /**
  * Scan an edge community connected to a vertex.
- * @param vcs communities vertex u is linked to (updated)
- * @param vcout total edge weight from vertex u to community C (updated)
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
  * @param u given vertex
  * @param v outgoing edge vertex
  * @param w outgoing edge weight
  * @param vcom community each vertex belongs to
- * @param fh hash function mapping community to index
  */
-template <bool SELF=false, class K, class V, class W, class FH>
-inline void leidenLowmemScanCommunityW(vector<K>& vcs, vector<W>& vcout, K u, K v, V w, const vector<K>& vcom, FH fh) {
-  leidenLowmemScanCommunityW<SELF, false>(vcs, vcout, u, v, w, vcom, vcom, fh);
+template <bool SELF=false, class K, class V, size_t SLOTS>
+inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, K u, K v, V w, const vector<K>& vcom) {
+  leidenLowmemScanCommunityW<SELF>(mcs, mws, u, v, w, vcom, vcom);
 }
 
 
 /**
  * Scan communities connected to a vertex.
- * @param vcs communities vertex u is linked to (updated)
- * @param vcout total edge weight from vertex u to community C (updated)
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
  * @param x original graph
  * @param u given vertex
  * @param vcom community each vertex belongs to
  * @param vcob community bound each vertex belongs to
- * @param fh hash function mapping community to index
  */
-template <bool SELF=false, bool REFINE=false, class G, class K, class W, class FH>
-inline void leidenLowmemScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob, FH fh) {
-  x.forEachEdge(u, [&](auto v, auto w) { leidenLowmemScanCommunityW<SELF, REFINE>(vcs, vcout, u, v, w, vcom, vcob, fh); });
+template <bool SELF=false, bool REFINE=false, class G, class K, class V, size_t SLOTS>
+inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
+  x.forEachEdge(u, [&](auto v, auto w) { leidenLowmemScanCommunityW<SELF, REFINE>(mcs, mws, u, v, V(w), vcom, vcob); });
 }
 
 
 /**
  * Scan communities connected to a vertex.
- * @param vcs communities vertex u is linked to (updated)
- * @param vcout total edge weight from vertex u to community C (updated)
+ * @param mcs majority communities vertex u is linked to (updated)
+ * @param mws total edge weight from vertex u to community C (updated)
  * @param x original graph
  * @param u given vertex
  * @param vcom community each vertex belongs to
- * @param fh hash function mapping community to index
  */
-template <bool SELF=false, class G, class K, class W, class FH>
-inline void leidenLowmemScanCommunitiesW(vector<K>& vcs, vector<W>& vcout, const G& x, K u, const vector<K>& vcom, FH fh) {
-  leidenLowmemScanCommunitiesW<SELF, false>(vcs, vcout, x, u, vcom, vcom, fh);
+template <bool SELF=false, class G, class K, class V, size_t SLOTS>
+inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, const G& x, K u, const vector<K>& vcom) {
+  leidenLowmemScanCommunitiesW<SELF>(mcs, mws, x, u, vcom, vcom);
+}
+
+
+/**
+ * Scan communities connected to a vertex.
+ * @param x original graph
+ * @param u given vertex
+ * @param vcom community each vertex belongs to
+ * @param vcob community bound each vertex belongs to
+ * @returns [majority community, total edge weight to community]
+ */
+template <bool SELF=false, bool REFINE=false, class G, class K>
+inline auto leidenLowmemScanCommunitiesMajorityW(const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
+  using V = typename G::edge_value_type;
+  K mc = K();
+  V mw = V();
+  x.forEachEdge(u, [&](auto v, auto w) {
+    if (!SELF && u==v) return;
+    if (REFINE && vcob[u]!=vcob[v]) return;
+    K c = vcom[v];
+    if (c==mc)     mw += w;
+    else if (mw>w) mw -= w;
+    else { mc = c; mw  = w; }
+  });
+  return make_pair(mc, mw);
+}
+
+
+/**
+ * Scan communities connected to a vertex.
+ * @param x original graph
+ * @param u given vertex
+ * @param vcom community each vertex belongs to
+ * @returns [majority community, total edge weight to community]
+ */
+template <bool SELF=false, class G, class K>
+inline auto leidenLowmemScanCommunitiesMajorityW(const G& x, K u, const vector<K>& vcom) {
+  return leidenLowmemScanCommunitiesMajorityW<SELF>(x, u, vcom, vcom);
 }
 
 
 /**
  * Clear communities scan data.
- * @param vcs total edge weight from vertex u to community C (updated)
- * @param vcout communities vertex u is linked to (updated)
- * @param fh hash function mapping community to index
+ * @param mws communities vertex u is linked to (updated)
  */
-template <class K, class W, class FH>
-inline void leidenLowmemClearScanW(vector<K>& vcs, vector<W>& vcout, FH fh) {
-  for (K c : vcs)
-    vcout[fh(c)] = W();
-  vcs.clear();
+template <class V, size_t SLOTS>
+inline void leidenLowmemClearScanW(array<V, SLOTS>& mws) {
+  for (int i=0; i<SLOTS; ++i)
+    mws[i] = V();
 }
 
 
 /**
  * Choose connected community with best delta modularity.
+ * @param mws total edge weight from vertex u to community C (updated)
  * @param x original graph
  * @param u given vertex
  * @param d previous community of vertex u
+ * @param mcs majority communities vertex u is linked to
+ * @param vcom community each vertex belongs to
+ * @param vcob community bound each vertex belongs to
  * @param vtot total edge weight of each vertex
  * @param ctot total edge weight of each community
- * @param vcs communities vertex u is linked to
- * @param vcout total edge weight from vertex u to community C
  * @param M total weight of "undirected" graph (1/2 of directed graph)
  * @param R resolution (0, 1]
- * @param fh hash function mapping community to index
  * @returns [best community, delta modularity]
  */
-template <bool SELF=false, class G, class K, class W, class FH>
-inline auto leidenLowmemChooseCommunity(const G& x, K u, K d, const vector<W>& vtot, const vector<W>& ctot, const vector<K>& vcs, const vector<W>& vcout, double M, double R, FH fh) {
+template <bool SELF=false, bool REFINE=false, class G, class K, class V, class W, size_t SLOTS>
+inline auto leidenLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, K d, const array<K, SLOTS>& mcs, const vector<K>& vcom, const vector<K>& vcob, const vector<W>& vtot, const vector<W>& ctot, double M, double R) {
+  V dw = V();
+  leidenLowmemClearScanW(mws);
+  // Compute total edge weight to communities.
+  x.forEachEdge(u, [&](auto v, auto w) {
+    if (!SELF && u==v) return;
+    if (REFINE && vcob[u]!=vcob[v]) return;
+    K c = vcom[v];
+    if (c==d) dw += w;
+    for (int i=0; i<SLOTS; ++i)
+      mws[i] += mcs[i]==c? w : V();
+  });
+  // Choose community with best delta modularity.
   K cmax = K();
   W emax = W();
-  for (K c : vcs) {
+  for (int i=0; i<SLOTS; ++i) {
+    K c = mcs[i];
+    V w = mws[i];
+    if (!w) continue;
     if (!SELF && c==d) continue;
-    W e = deltaModularity(vcout[fh(c)], vcout[fh(d)], vtot[u], ctot[c], ctot[d], M, R);
+    W e = deltaModularity(w, dw, vtot[u], ctot[c], ctot[d], M, R);
     if (e>emax) { emax = e; cmax = c; }
   }
   return make_pair(cmax, emax);
+}
+
+
+/**
+ * Compute delta modularity to majority community.
+ * @param x original graph
+ * @param u given vertex
+ * @param d previous community of vertex u
+ * @param c majority community vertex u is linked to
+ * @param vcom community each vertex belongs to
+ * @param vcob community bound each vertex belongs to
+ * @param vtot total edge weight of each vertex
+ * @param ctot total edge weight of each community
+ * @param M total weight of "undirected" graph (1/2 of directed graph)
+ * @param R resolution (0, 1]
+ * @returns delta modularity to majority community
+ * @note You need to ensure that c!=d
+ */
+template <bool SELF=false, bool REFINE=false, class G, class K, class W>
+inline W leidenLowmemDeltaModularityMajority(const G& x, K u, K d, K c, const vector<K>& vcom, const vector<K>& vcob, const vector<W>& vtot, const vector<W>& ctot, double M, double R) {
+  using V = typename G::edge_value_type;
+  V dw = V();
+  V cw = V();
+  x.forEachEdge(u, [&](auto v, auto w) {
+    if (!SELF && u==v) return;
+    if (REFINE && vcob[u]!=vcob[v]) return;
+    K b = vcom[v];
+    if (b==d) dw += w;
+    if (b==c) cw += w;
+  });
+  return deltaModularity(cw, dw, vtot[u], ctot[c], ctot[d], M, R);
 }
 #pragma endregion
 
@@ -137,8 +271,8 @@ inline auto leidenLowmemChooseCommunity(const G& x, K u, K d, const vector<W>& v
  * @param vcom community each vertex belongs to (initial, updated)
  * @param ctot total edge weight of each community (precalculated, updated)
  * @param vaff is vertex affected flag (updated)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param mcs majority communities vertex u is linked to (temporary buffer, updated)
+ * @param mws total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
  * @param vcob community bound each vertex belongs to
  * @param vtot total edge weight of each vertex
@@ -147,12 +281,10 @@ inline auto leidenLowmemChooseCommunity(const G& x, K u, K d, const vector<W>& v
  * @param L max iterations
  * @param fc has local moving phase converged?
  * @param fa is vertex allowed to be updated?
- * @param fb track communities that need to be broken
- * @param fh hash function mapping community to index
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, class G, class K, class W, class B, class FC, class FA, class FB, class FH>
-inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa, FB fb, FH fh) {
+template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC, class FA>
+inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa) {
   size_t S = x.span();
   int l = 0;
   W  el = W();
@@ -166,15 +298,27 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
       if (!fa(u)) continue;
       if (!REFINE && !vaff[u]) continue;
       if ( REFINE && (d!=u || ctot[d]>vtot[u])) continue;
-      leidenLowmemClearScanW(*vcs[t], *vcout[t], fh);
-      leidenLowmemScanCommunitiesW<false, REFINE>(*vcs[t], *vcout[t], x, u, vcom, vcob, fh);
-      auto [c, e] = leidenLowmemChooseCommunity(x, u, d, vtot, ctot, *vcs[t], *vcout[t], M, R, fh);
-      if (e && leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) {
-        if (!REFINE) fb(d);
+      // Perform local-move using multiple majority communities (Misra-Gries sketch).
+      while (MULTI) {
+        leidenLowmemClearScanW(*mws[t]);
+        leidenLowmemScanCommunitiesW<false, REFINE>(*mcs[t], *mws[t], x, u, vcom, vcob);
+        auto [c, e] = leidenLowmemChooseCommunityW<false, REFINE>(*mws[t], x, u, d, *mcs[t], vcom, vcob, vtot, ctot, M, R);
+        if (e<=0 || leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
         if (!REFINE) x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); });
+        el += e;  // l1-norm
+        break;
+      }
+      // Perform local-move using a single majority community (Boyer-Moore majority vote).
+      while (!MULTI) {
+        auto [c, w] = leidenLowmemScanCommunitiesMajorityW<false, REFINE>(x, u, vcom, vcob);
+        if   (c==d) break;
+        auto  e = leidenLowmemDeltaModularityMajority<false, REFINE>(x, u, d, c, vcom, vcob, vtot, ctot, M, R);
+        if   (e<=0 || leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
+        if (!REFINE) x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); });
+        el += e;  // l1-norm
+        break;
       }
       if (!REFINE) vaff[u] = B();
-      el += e;  // l1-norm
     }
     if (REFINE || fc(el, l++)) break;
   }
@@ -187,8 +331,8 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param vcom community each vertex belongs to (initial, updated)
  * @param ctot total edge weight of each community (precalculated, updated)
  * @param vaff is vertex affected flag (updated)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param mcs majority communities vertex u is linked to (temporary buffer, updated)
+ * @param mws total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
  * @param vcob community bound each vertex belongs to
  * @param vtot total edge weight of each vertex
@@ -196,38 +340,12 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param R resolution (0, 1]
  * @param L max iterations
  * @param fc has local moving phase converged?
- * @param fa is vertex allowed to be updated?
- * @param fh hash function mapping community to index
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, class G, class K, class W, class B, class FC, class FA, class FH>
-inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa, FH fh) {
-  auto fb = [](auto u) {};
-  return leidenLowmemMoveOmpW<REFINE>(vcom, ctot, vaff, vcs, vcout, x, vcob, vtot, M, R, L, fc, fa, fb, fh);
-}
-
-
-/**
- * Leiden algorithm's local moving phase.
- * @param vcom community each vertex belongs to (initial, updated)
- * @param ctot total edge weight of each community (precalculated, updated)
- * @param vaff is vertex affected flag (updated)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
- * @param x original graph
- * @param vcob community bound each vertex belongs to
- * @param vtot total edge weight of each vertex
- * @param M total weight of "undirected" graph (1/2 of directed graph)
- * @param R resolution (0, 1]
- * @param L max iterations
- * @param fc has local moving phase converged?
- * @param fh hash function mapping community to index
- * @returns iterations performed (0 if converged already)
- */
-template <bool REFINE=false, class G, class K, class W, class B, class FC, class FH>
-inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FH fh) {
+template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC>
+inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   auto fa = [](auto u) { return true; };
-  return leidenLowmemMoveOmpW<REFINE>(vcom, ctot, vaff, vcs, vcout, x, vcob, vtot, M, R, L, fc, fa, fh);
+  return leidenLowmemMoveOmpW<REFINE, MULTI>(vcom, ctot, vaff, mcs, mws, x, vcob, vtot, M, R, L, fc, fa);
 }
 #pragma endregion
 
@@ -240,17 +358,16 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param ydeg degree of each community (updated)
  * @param yedg vertex ids of outgoing edges of each community (updated)
  * @param ywei weights of outgoing edges of each community (updated)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param mcs majority communities vertex u is linked to (temporary buffer, updated)
+ * @param mws total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
  * @param vcom community each vertex belongs to
  * @param coff offsets for vertices belonging to each community
  * @param cedg vertices belonging to each community
  * @param yoff offsets for vertices belonging to each community
- * @param fh hash function mapping community to index
  */
-template <int CHUNK_SIZE=2048, class G, class K, class W, class FH>
-inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, const vector<K>& coff, const vector<K>& cedg, const vector<size_t>& yoff, FH fh) {
+template <int CHUNK_SIZE=2048, class G, class K, class V, class W, size_t SLOTS>
+inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcom, const vector<K>& coff, const vector<K>& cedg, const vector<size_t>& yoff) {
   size_t C = coff.size() - 1;
   fillValueOmpU(ydeg, K());
   #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
@@ -258,12 +375,16 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
     int t = omp_get_thread_num();
     K   n = csrDegree(coff, c);
     if (n==0) continue;
-    leidenLowmemClearScanW(*vcs[t], *vcout[t], fh);
+    leidenLowmemClearScanW(*mws[t]);
     csrForEachEdgeKey(coff, cedg, c, [&](auto u) {
-      leidenLowmemScanCommunitiesW<true>(*vcs[t], *vcout[t], x, u, vcom, fh);
+      leidenLowmemScanCommunitiesW<true>(*mcs[t], *mws[t], x, u, vcom);
     });
-    for (auto d : *vcs[t])
-      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, (*vcout[t])[fh(d)]);
+    for (int i=0; i<SLOTS; ++i) {
+      K d = (*mcs[t])[i];
+      V w = (*mws[t])[i];
+      if (!w) continue;
+      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, W(w));
+    }
   }
 }
 
@@ -275,20 +396,19 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
  * @param yedg vertex ids of outgoing edges of each community (updated)
  * @param ywei weights of outgoing edges of each community (updated)
  * @param bufs buffer for exclusive scan of size |threads| (scratch)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
+ * @param mcs majority communities vertex u is linked to (temporary buffer, updated)
+ * @param mws total edge weight from vertex u to community C (temporary buffer, updated)
  * @param x original graph
  * @param vcom community each vertex belongs to
  * @param coff offsets for vertices belonging to each community
  * @param cedg vertices belonging to each community
- * @param fh hash function mapping community to index
  */
-template <int CHUNK_SIZE=2048, class G, class K, class W, class FH>
-inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<size_t>& bufs, vector<vector<K>*>& vcs, vector<vector<W>*>& vcout, const G& x, const vector<K>& vcom, vector<K>& coff, vector<K>& cedg, FH fh) {
+template <int CHUNK_SIZE=2048, class G, class K, class V, class W, size_t SLOTS>
+inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<size_t>& bufs, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcom, vector<K>& coff, vector<K>& cedg) {
   size_t C = coff.size() - 1;
   leidenCommunityTotalDegreeOmpW(yoff, x, vcom);
   yoff[C] = exclusiveScanOmpW(yoff.data(), bufs.data(), yoff.data(), C);
-  leidenLowmemAggregateEdgesOmpW<CHUNK_SIZE>(ydeg, yedg, ywei, vcs, vcout, x, vcom, coff, cedg, yoff, fh);
+  leidenLowmemAggregateEdgesOmpW<CHUNK_SIZE>(ydeg, yedg, ywei, mcs, mws, x, vcom, coff, cedg, yoff);
 }
 #pragma endregion
 
@@ -301,14 +421,14 @@ inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vec
  * @param x original graph
  * @param o leiden options
  * @param fi initializing community membership and total vertex/community weights (vcom, vtot, ctot)
- * @param fm marking affected vertices (vaff, vcs, vcout, vcom, vtot, ctot)
+ * @param fm marking affected vertices (vaff, mcs, mws, vcom, vtot, ctot)
  * @param fa is vertex allowed to be updated? (u)
- * @param fh hash function mapping community to index
  * @returns leiden result
  */
-template <class G, class FI, class FM, class FA, class FH>
-inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa, FH fh) {
+template <bool MULTI=false, size_t SLOTS=4, class G, class FI, class FM, class FA>
+inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
+  using  V = typename G::edge_value_type;
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = char;
   // Options.
@@ -328,9 +448,9 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   vector<W> ctot(S);            // Total community weights (any pass)
   vector<K> bufk(T);            // Buffer for exclusive scan
   vector<size_t> bufs(T);       // Buffer for exclusive scan
-  vector<vector<K>*> vcs(T);    // Hashtable keys
-  vector<vector<W>*> vcout(T);  // Hashtable values
-  leidenAllocateHashtablesW(vcs, vcout, o.numSlots);
+  vector<array<K, SLOTS>*> mcs(T);  // Hashtable keys
+  vector<array<V, SLOTS>*> mws(T);  // Hashtable values
+  leidenLowmemAllocateHashtablesW(mcs, mws);
   size_t Z = max(size_t(o.aggregationTolerance * X), X);
   size_t Y = max(size_t(o.aggregationTolerance * Z), Z);
   DiGraphCsr<K, None, None, K> cv(S, S);  // CSR for community vertices
@@ -360,7 +480,7 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
       });
       // Mark affected vertices.
       tm += measureDuration([&]() {
-        fm(vaff, vcs, vcout, ucom, utot, ctot);
+        fm(vaff, mcs, mws, ucom, utot, ctot);
       });
       // Start timing first pass.
       auto t0 = timeNow(), t1 = t0;
@@ -372,8 +492,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
         bool isFirst = p==0;
         int m = 0;
         tl += measureDuration([&]() {
-          if (isFirst) m += leidenLowmemMoveOmpW(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fa, fh);
-          else         m += leidenLowmemMoveOmpW(vcom, ctot, vaff, vcs, vcout, y, vcob, vtot, M, R, L, fc, fh);
+          if (isFirst) m += leidenLowmemMoveOmpW<false, MULTI>(ucom, ctot, vaff, mcs, mws, x, vcob, utot, M, R, L, fc, fa);
+          else         m += leidenLowmemMoveOmpW<false, MULTI>(vcom, ctot, vaff, mcs, mws, y, vcob, vtot, M, R, L, fc);
         });
         tr += measureDuration([&]() {
           if (isFirst) copyValuesOmpW(vcob.data(), ucom.data(), x.span());  // swap(vcob, ucom);
@@ -382,8 +502,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
           else         leidenInitializeOmpW(vcom, ctot, y, vtot);
           // if (isFirst) fillValueOmpU(vaff.data(), x.order(), B(1));
           // else         fillValueOmpU(vaff.data(), y.order(), B(1));
-          if (isFirst) m += leidenLowmemMoveOmpW<true>(ucom, ctot, vaff, vcs, vcout, x, vcob, utot, M, R, L, fc, fh);
-          else         m += leidenLowmemMoveOmpW<true>(vcom, ctot, vaff, vcs, vcout, y, vcob, vtot, M, R, L, fc, fh);
+          if (isFirst) m += leidenLowmemMoveOmpW<true, MULTI>(ucom, ctot, vaff, mcs, mws, x, vcob, utot, M, R, L, fc);
+          else         m += leidenLowmemMoveOmpW<true, MULTI>(vcom, ctot, vaff, mcs, mws, y, vcob, vtot, M, R, L, fc);
         });
         l += max(m, 1); ++p;
         if (m<=1 || p>=P) break;
@@ -400,8 +520,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
           cv.respan(CN); z.respan(CN);
           if (isFirst) leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
           else         leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
-          if (isFirst) leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys, fh);
-          else         leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys, fh);
+          if (isFirst) leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, mcs, mws, x, ucom, cv.offsets, cv.edgeKeys);
+          else         leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, mcs, mws, y, vcom, cv.offsets, cv.edgeKeys);
         });
         swap(y, z);
         // fillValueOmpU(vcob.data(), CN, K());
@@ -419,7 +539,7 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
       tp += duration(t0, t1);
     });
   }, o.repeat);
-  leidenFreeHashtablesW(vcs, vcout);
+  leidenLowmemFreeHashtablesW(mcs, mws);
   return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat);
 }
 #pragma endregion
@@ -430,25 +550,23 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
 #pragma region STATIC APPROACH
 /**
  * Obtain the community membership of each vertex with Static Leiden.
- * @tparam SLOTS number of slots in each hashtable
  * @param x original graph
  * @param o leiden options
- * @param fh hash function mapping community to index
  * @returns leiden result
  */
-template <class G, class FH>
-inline auto leidenLowmemStaticOmp(const G& x, const LeidenOptions& o, FH fh) {
+template <bool MULTI=false, size_t SLOTS=4, class G>
+inline auto leidenLowmemStaticOmp(const G& x, const LeidenOptions& o={}) {
   using B = char;
   using W = LEIDEN_WEIGHT_TYPE;
   auto fi = [&](auto& vcom, auto& vtot, auto& ctot) {
     leidenVertexWeightsOmpW(vtot, x);
     leidenInitializeOmpW(vcom, ctot, x, vtot);
   };
-  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom, const auto& vtot, const auto& ctot) {
+  auto fm = [ ](auto& vaff, auto& mcs, auto& mws, const auto& vcom, const auto& vtot, const auto& ctot) {
     fillValueOmpU(vaff, B(1));
   };
   auto fa = [ ](auto u) { return true; };
-  return leidenLowmemInvokeOmp(x, o, fi, fm, fa, fh);
+  return leidenLowmemInvokeOmp<MULTI, SLOTS>(x, o, fi, fm, fa);
 }
 #pragma endregion
 #pragma endregion
