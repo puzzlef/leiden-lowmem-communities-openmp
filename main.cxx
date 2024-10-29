@@ -83,6 +83,18 @@ void runExperiment(const G& x) {
     auto b1 = leidenLowmemStaticOmp<true, 32>(x, repeat);
     flog(b1, "leidenLowmemStaticOmpMajorities", 32);
   }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 64>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmpMajorities", 64);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 128>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmpMajorities", 128);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 256>(x, repeat);
+    flog(b1, "leidenLowmemStaticOmpMajorities", 256);
+  }
 }
 
 
