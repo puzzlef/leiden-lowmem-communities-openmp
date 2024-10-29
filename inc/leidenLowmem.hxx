@@ -303,7 +303,7 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
         leidenLowmemClearScanW(*mws[t]);
         leidenLowmemScanCommunitiesW<false, REFINE>(*mcs[t], *mws[t], x, u, vcom, vcob);
         auto [c, e] = leidenLowmemChooseCommunityW<false, REFINE>(*mws[t], x, u, d, *mcs[t], vcom, vcob, vtot, ctot, M, R);
-        if (e<=0 || leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
+        if (e<=0 || !leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
         if (!REFINE) x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); });
         el += e;  // l1-norm
         break;
@@ -313,7 +313,7 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
         auto [c, w] = leidenLowmemScanCommunitiesMajorityW<false, REFINE>(x, u, vcom, vcob);
         if   (c==d) break;
         auto  e = leidenLowmemDeltaModularityMajority<false, REFINE>(x, u, d, c, vcom, vcob, vtot, ctot, M, R);
-        if   (e<=0 || leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
+        if   (e<=0 || !leidenChangeCommunityOmpW<REFINE>(vcom, ctot, x, u, d, c, vtot)) break;
         if (!REFINE) x.forEachEdgeKey(u, [&](auto v) { vaff[v] = B(1); });
         el += e;  // l1-norm
         break;
