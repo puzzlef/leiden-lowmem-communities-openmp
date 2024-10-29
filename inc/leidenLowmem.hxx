@@ -402,6 +402,7 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
       }
       if (!REFINE) vaff[u] = B();
     }
+    printf("l=%d, el=%.3e\n", l, el);
     if (REFINE || fc(el, l++)) break;
   }
   return l>1 || el? l : 0;
