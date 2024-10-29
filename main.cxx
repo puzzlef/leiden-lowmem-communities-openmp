@@ -45,6 +45,32 @@ inline double getModularity(const G& x, const R& a, double M) {
 // PERFORM EXPERIMENT
 // ------------------
 
+template <size_t NUM_SLOTS, class G, class FL>
+inline auto runLeidenLowmem(const G& x, int repeat, FL flog) {
+  auto fh = [](auto c) { return c % NUM_SLOTS; };
+  {
+    auto b1 = leidenLowmemStaticOmp<false>(x, {repeat, NUM_SLOTS}, fh);
+    flog(b1, "leidenLowmemStaticOmpMajority", NUM_SLOTS);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 4>(x, {repeat, NUM_SLOTS}, fh);
+    flog(b1, "leidenLowmemStaticOmpMajorities4", NUM_SLOTS);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 8>(x, {repeat, NUM_SLOTS}, fh);
+    flog(b1, "leidenLowmemStaticOmpMajorities8", NUM_SLOTS);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 16>(x, {repeat, NUM_SLOTS}, fh);
+    flog(b1, "leidenLowmemStaticOmpMajorities16", NUM_SLOTS);
+  }
+  {
+    auto b1 = leidenLowmemStaticOmp<true, 32>(x, {repeat, NUM_SLOTS}, fh);
+    flog(b1, "leidenLowmemStaticOmpMajorities32", NUM_SLOTS);
+  }
+}
+
+
 template <class G>
 void runExperiment(const G& x) {
   int repeat = REPEAT_METHOD;
@@ -63,26 +89,34 @@ void runExperiment(const G& x) {
     flog(b0, "leidenStaticOmp");
   }
   // Get community memberships on original graph (low memory).
-  {
-    auto b1 = leidenLowmemStaticOmp<false>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajority", 0);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 4>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 4);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 8>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 8);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 16>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 16);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 32>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 32);
-  }
+  runLeidenLowmem<(1 << 28)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 27)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 26)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 25)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 24)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 23)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 22)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 21)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 20)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 19)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 18)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 17)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 16)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 15)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 14)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 13)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 12)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 11)>(x, repeat, flog);
+  runLeidenLowmem<(1 << 10)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  9)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  8)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  7)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  6)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  5)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  4)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  3)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  2)>(x, repeat, flog);
+  runLeidenLowmem<(1 <<  1)>(x, repeat, flog);
 }
 
 
