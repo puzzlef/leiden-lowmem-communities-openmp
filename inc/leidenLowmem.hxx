@@ -26,12 +26,12 @@ using std::max;
  * @param mcs majority communities vertex u is linked to (updated)
  * @param mws total edge weight from vertex u to community C (updated)
  */
-template <class K, class V, size_t SLOTS>
-inline void leidenLowmemAllocateHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws) {
+template <class K, class W, size_t SLOTS>
+inline void leidenLowmemAllocateHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws) {
   size_t N = mcs.size();
   for (size_t i=0; i<N; ++i) {
     mcs[i] = new array<K, SLOTS>();
-    mws[i] = new array<V, SLOTS>();
+    mws[i] = new array<W, SLOTS>();
   }
 }
 
@@ -41,8 +41,8 @@ inline void leidenLowmemAllocateHashtablesW(vector<array<K, SLOTS>*>& mcs, vecto
  * @param mcs majority communities vertex u is linked to (updated)
  * @param mws total edge weight from vertex u to community C (updated)
  */
-template <class K, class V, size_t SLOTS>
-inline void leidenLowmemFreeHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws) {
+template <class K, class W, size_t SLOTS>
+inline void leidenLowmemFreeHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws) {
   size_t N = mcs.size();
   for (size_t i=0; i<N; ++i) {
     delete mcs[i];
@@ -65,14 +65,14 @@ inline void leidenLowmemFreeHashtablesW(vector<array<K, SLOTS>*>& mcs, vector<ar
  * @param vcom community each vertex belongs to
  * @param vcob community bound each vertex belongs to
  */
-template <bool SELF=false, bool REFINE=false, class K, class V, size_t SLOTS>
-inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, K u, K v, V w, const vector<K>& vcom, const vector<K>& vcob) {
+template <bool SELF=false, bool REFINE=false, class K, class W, size_t SLOTS>
+inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<W, SLOTS>& mws, K u, K v, W w, const vector<K>& vcom, const vector<K>& vcob) {
   if (!SELF && u==v) return;
   if (REFINE && vcob[u]!=vcob[v]) return;
   K c = vcom[v];
   // Add edge weight to community.
   for (int i=0; i<SLOTS; ++i)
-    mws[i] += mcs[i]==c? w : V();
+    mws[i] += mcs[i]==c? w : W();
   // Check if community is already in the list.
   int has = 0;
   for (int i=0; i<SLOTS; ++i)
@@ -81,7 +81,7 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
   // Find empty slot.
   int f = -1;
   for (int i=0; i<SLOTS; ++i)
-    if (mws[i]==V()) f = i;
+    if (mws[i]==W()) f = i;
   // Add community to list.
   if (f>=0) {
     mcs[f] = c;
@@ -90,7 +90,7 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
   // Subtract edge weight from non-matching communities.
   else {
     for (int i=0; i<SLOTS; ++i)
-      mws[i] = max(mws[i] - w, V());
+      mws[i] = max(mws[i] - w, W());
   }
 }
 
@@ -104,8 +104,8 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
  * @param w outgoing edge weight
  * @param vcom community each vertex belongs to
  */
-template <bool SELF=false, class K, class V, size_t SLOTS>
-inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, K u, K v, V w, const vector<K>& vcom) {
+template <bool SELF=false, class K, class W, size_t SLOTS>
+inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<W, SLOTS>& mws, K u, K v, W w, const vector<K>& vcom) {
   leidenLowmemScanCommunityW<SELF>(mcs, mws, u, v, w, vcom, vcom);
 }
 
@@ -119,9 +119,9 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
  * @param vcom community each vertex belongs to
  * @param vcob community bound each vertex belongs to
  */
-template <bool SELF=false, bool REFINE=false, class G, class K, class V, size_t SLOTS>
-inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
-  x.forEachEdge(u, [&](auto v, auto w) { leidenLowmemScanCommunityW<SELF, REFINE>(mcs, mws, u, v, V(w), vcom, vcob); });
+template <bool SELF=false, bool REFINE=false, class G, class K, class W, size_t SLOTS>
+inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<W, SLOTS>& mws, const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
+  x.forEachEdge(u, [&](auto v, auto w) { leidenLowmemScanCommunityW<SELF, REFINE>(mcs, mws, u, v, W(w), vcom, vcob); });
 }
 
 
@@ -133,8 +133,8 @@ inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& 
  * @param u given vertex
  * @param vcom community each vertex belongs to
  */
-template <bool SELF=false, class G, class K, class V, size_t SLOTS>
-inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& mws, const G& x, K u, const vector<K>& vcom) {
+template <bool SELF=false, class G, class K, class W, size_t SLOTS>
+inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<W, SLOTS>& mws, const G& x, K u, const vector<K>& vcom) {
   leidenLowmemScanCommunitiesW<SELF>(mcs, mws, x, u, vcom, vcom);
 }
 
@@ -149,9 +149,9 @@ inline void leidenLowmemScanCommunitiesW(array<K, SLOTS>& mcs, array<V, SLOTS>& 
  */
 template <bool SELF=false, bool REFINE=false, class G, class K>
 inline auto leidenLowmemScanCommunitiesMajorityW(const G& x, K u, const vector<K>& vcom, const vector<K>& vcob) {
-  using V = typename G::edge_value_type;
+  using W = LEIDEN_WEIGHT_TYPE;
   K mc = K();
-  V mw = V();
+  W mw = W();
   x.forEachEdge(u, [&](auto v, auto w) {
     if (!SELF && u==v) return;
     if (REFINE && vcob[u]!=vcob[v]) return;
@@ -181,10 +181,10 @@ inline auto leidenLowmemScanCommunitiesMajorityW(const G& x, K u, const vector<K
  * Clear communities scan data.
  * @param mws communities vertex u is linked to (updated)
  */
-template <class V, size_t SLOTS>
-inline void leidenLowmemClearScanW(array<V, SLOTS>& mws) {
+template <class W, size_t SLOTS>
+inline void leidenLowmemClearScanW(array<W, SLOTS>& mws) {
   for (int i=0; i<SLOTS; ++i)
-    mws[i] = V();
+    mws[i] = W();
 }
 
 
@@ -203,9 +203,9 @@ inline void leidenLowmemClearScanW(array<V, SLOTS>& mws) {
  * @param R resolution (0, 1]
  * @returns [best community, delta modularity]
  */
-template <bool SELF=false, bool REFINE=false, class G, class K, class V, class W, size_t SLOTS>
-inline auto leidenLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, K d, const array<K, SLOTS>& mcs, const vector<K>& vcom, const vector<K>& vcob, const vector<W>& vtot, const vector<W>& ctot, double M, double R) {
-  V dw = V();
+template <bool SELF=false, bool REFINE=false, class G, class K, class W, size_t SLOTS>
+inline auto leidenLowmemChooseCommunityW(array<W, SLOTS>& mws, const G& x, K u, K d, const array<K, SLOTS>& mcs, const vector<K>& vcom, const vector<K>& vcob, const vector<W>& vtot, const vector<W>& ctot, double M, double R) {
+  W dw = W();
   leidenLowmemClearScanW(mws);
   // Compute total edge weight to communities.
   x.forEachEdge(u, [&](auto v, auto w) {
@@ -214,14 +214,14 @@ inline auto leidenLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, 
     K c = vcom[v];
     if (c==d) dw += w;
     for (int i=0; i<SLOTS; ++i)
-      mws[i] += mcs[i]==c? w : V();
+      mws[i] += mcs[i]==c? w : W();
   });
   // Choose community with best delta modularity.
   K cmax = K();
   W emax = W();
   for (int i=0; i<SLOTS; ++i) {
     K c = mcs[i];
-    V w = mws[i];
+    W w = mws[i];
     if (!w) continue;
     if (!SELF && c==d) continue;
     W e = deltaModularity(w, dw, vtot[u], ctot[c], ctot[d], M, R);
@@ -248,9 +248,8 @@ inline auto leidenLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, 
  */
 template <bool SELF=false, bool REFINE=false, class G, class K, class W>
 inline W leidenLowmemDeltaModularityMajority(const G& x, K u, K d, K c, const vector<K>& vcom, const vector<K>& vcob, const vector<W>& vtot, const vector<W>& ctot, double M, double R) {
-  using V = typename G::edge_value_type;
-  V dw = V();
-  V cw = V();
+  W dw = W();
+  W cw = W();
   x.forEachEdge(u, [&](auto v, auto w) {
     if (!SELF && u==v) return;
     if (REFINE && vcob[u]!=vcob[v]) return;
@@ -283,8 +282,8 @@ inline W leidenLowmemDeltaModularityMajority(const G& x, K u, K d, K c, const ve
  * @param fa is vertex allowed to be updated?
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC, class FA>
-inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa) {
+template <bool REFINE=false, bool MULTI=false, class G, class K, class W, class B, size_t SLOTS, class FC, class FA>
+inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa) {
   size_t S = x.span();
   int l = 0;
   W  el = W();
@@ -342,8 +341,8 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param fc has local moving phase converged?
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC>
-inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
+template <bool REFINE=false, bool MULTI=false, class G, class K, class W, class B, size_t SLOTS, class FC>
+inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   auto fa = [](auto u) { return true; };
   return leidenLowmemMoveOmpW<REFINE, MULTI>(vcom, ctot, vaff, mcs, mws, x, vcob, vtot, M, R, L, fc, fa);
 }
@@ -366,8 +365,8 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param cedg vertices belonging to each community
  * @param yoff offsets for vertices belonging to each community
  */
-template <int CHUNK_SIZE=2048, class G, class K, class V, class W, size_t SLOTS>
-inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcom, const vector<K>& coff, const vector<K>& cedg, const vector<size_t>& yoff) {
+template <int CHUNK_SIZE=2048, class G, class K, class W, size_t SLOTS>
+inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws, const G& x, const vector<K>& vcom, const vector<K>& coff, const vector<K>& cedg, const vector<size_t>& yoff) {
   size_t C = coff.size() - 1;
   fillValueOmpU(ydeg, K());
   #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
@@ -381,9 +380,9 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
     });
     for (int i=0; i<SLOTS; ++i) {
       K d = (*mcs[t])[i];
-      V w = (*mws[t])[i];
+      W w = (*mws[t])[i];
       if (!w) continue;
-      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, W(w));
+      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, w);
     }
   }
 }
@@ -403,8 +402,8 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
  * @param coff offsets for vertices belonging to each community
  * @param cedg vertices belonging to each community
  */
-template <int CHUNK_SIZE=2048, class G, class K, class V, class W, size_t SLOTS>
-inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<size_t>& bufs, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcom, vector<K>& coff, vector<K>& cedg) {
+template <int CHUNK_SIZE=2048, class G, class K, class W, size_t SLOTS>
+inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vector<K>& yedg, vector<W>& ywei, vector<size_t>& bufs, vector<array<K, SLOTS>*>& mcs, vector<array<W, SLOTS>*>& mws, const G& x, const vector<K>& vcom, vector<K>& coff, vector<K>& cedg) {
   size_t C = coff.size() - 1;
   leidenCommunityTotalDegreeOmpW(yoff, x, vcom);
   yoff[C] = exclusiveScanOmpW(yoff.data(), bufs.data(), yoff.data(), C);
@@ -428,7 +427,6 @@ inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vec
 template <bool MULTI=false, size_t SLOTS=4, class G, class FI, class FM, class FA>
 inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
-  using  V = typename G::edge_value_type;
   using  W = LEIDEN_WEIGHT_TYPE;
   using  B = char;
   // Options.
@@ -449,7 +447,7 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   vector<K> bufk(T);            // Buffer for exclusive scan
   vector<size_t> bufs(T);       // Buffer for exclusive scan
   vector<array<K, SLOTS>*> mcs(T);  // Hashtable keys
-  vector<array<V, SLOTS>*> mws(T);  // Hashtable values
+  vector<array<W, SLOTS>*> mws(T);  // Hashtable values
   leidenLowmemAllocateHashtablesW(mcs, mws);
   size_t Z = max(size_t(o.aggregationTolerance * X), X);
   size_t Y = max(size_t(o.aggregationTolerance * Z), Z);
