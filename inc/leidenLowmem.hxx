@@ -78,6 +78,9 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
   for (int i=0; i<SLOTS; ++i)
     has |= mcs[i]==c? -1 : 0;
   if (has) return;
+  // Subtract edge weight from non-matching communities.
+  for (int i=0; i<SLOTS; ++i)
+    mws[i] = max(mws[i] - w, V());
   // Find empty slot.
   int f = -1;
   for (int i=0; i<SLOTS; ++i)
@@ -86,11 +89,6 @@ inline void leidenLowmemScanCommunityW(array<K, SLOTS>& mcs, array<V, SLOTS>& mw
   if (f>=0) {
     mcs[f] = c;
     mws[f] = w;
-  }
-  // Subtract edge weight from non-matching communities.
-  else {
-    for (int i=0; i<SLOTS; ++i)
-      mws[i] = max(mws[i] - w, V());
   }
 }
 
