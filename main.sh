@@ -20,7 +20,6 @@ if [[ "$DOWNLOAD" != "0" ]]; then
   rm -rf $src
   git clone https://github.com/puzzlef/$src
   cd $src
-  git checkout approach-majorities
 fi
 
 # Fixed config
