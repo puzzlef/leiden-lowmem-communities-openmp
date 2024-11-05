@@ -4,11 +4,11 @@ Community detection in graphs identifies groups of nodes that are more densely c
 
 Below we plot the time taken by [Default Leiden], weighted Boyer-Moore (BM) based Leiden, and weighted Misra-Gries (MG) based Leiden with `k=64` slots, on 13 different graphs. MG64 Leiden is, on average, `3.19x` slower than Default Leiden, but requires significantly less memory (i.e., just `0.5 KB` per thread).
 
-[![](https://i.imgur.com/derv6de.png)][sheets-o1]
+[![](https://i.imgur.com/JeqtGOA.png)][sheets-o1]
 
 Next, we plot the modularity of communities identified by Default Leiden, BM Leiden, and MG8 Leiden. MG8 Leiden, on average, achieves a modularity within `1%` of Default Leiden - and is thus a viable memory-efficient alternative to the Default Leiden. Higher values of `k` can be chosen for even better modularity, if needed.
 
-[![](https://i.imgur.com/EiM7Hdn.png)][sheets-o1]
+[![](https://i.imgur.com/2xcUXzp.png)][sheets-o1]
 
 Refer to our technical report for more details: \
 [Memory-Efficient Community Detection on Large Graphs Using Weighted Sketches][report].
