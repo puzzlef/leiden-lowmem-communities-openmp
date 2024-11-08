@@ -283,7 +283,7 @@ inline W leidenLowmemDeltaModularityMajority(const G& x, K u, K d, K c, const ve
  * @param fa is vertex allowed to be updated?
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC, class FA>
+template <bool REFINE=false, bool MULTI=true, class G, class K, class V, class W, class B, size_t SLOTS, class FC, class FA>
 inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc, FA fa) {
   size_t S = x.span();
   int l = 0;
@@ -342,7 +342,7 @@ inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaf
  * @param fc has local moving phase converged?
  * @returns iterations performed (0 if converged already)
  */
-template <bool REFINE=false, bool MULTI=false, class G, class K, class V, class W, class B, size_t SLOTS, class FC>
+template <bool REFINE=false, bool MULTI=true, class G, class K, class V, class W, class B, size_t SLOTS, class FC>
 inline int leidenLowmemMoveOmpW(vector<K>& vcom, vector<W>& ctot, vector<B>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, const vector<K>& vcob, const vector<W>& vtot, double M, double R, int L, FC fc) {
   auto fa = [](auto u) { return true; };
   return leidenLowmemMoveOmpW<REFINE, MULTI>(vcom, ctot, vaff, mcs, mws, x, vcob, vtot, M, R, L, fc, fa);
@@ -425,7 +425,7 @@ inline void leidenLowmemAggregateOmpW(vector<size_t>& yoff, vector<K>& ydeg, vec
  * @param fa is vertex allowed to be updated? (u)
  * @returns leiden result
  */
-template <bool MULTI=false, size_t SLOTS=4, class G, class FI, class FM, class FA>
+template <bool MULTI=true, size_t SLOTS=64, class G, class FI, class FM, class FA>
 inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM fm, FA fa) {
   using  K = typename G::key_type;
   using  V = typename G::edge_value_type;
@@ -554,7 +554,7 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
  * @param o leiden options
  * @returns leiden result
  */
-template <bool MULTI=false, size_t SLOTS=4, class G>
+template <bool MULTI=true, size_t SLOTS=64, class G>
 inline auto leidenLowmemStaticOmp(const G& x, const LeidenOptions& o={}) {
   using B = char;
   using W = LEIDEN_WEIGHT_TYPE;

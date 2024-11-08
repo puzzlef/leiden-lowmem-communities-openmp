@@ -64,36 +64,8 @@ void runExperiment(const G& x) {
   }
   // Get community memberships on original graph (low memory).
   {
-    auto b1 = leidenLowmemStaticOmp<false>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajority", 0);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 4>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 4);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 8>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 8);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 16>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 16);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 32>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 32);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 64>(x, repeat);
+    auto b1 = leidenLowmemStaticOmp(x, {repeat});
     flog(b1, "leidenLowmemStaticOmpMajorities", 64);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 128>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 128);
-  }
-  {
-    auto b1 = leidenLowmemStaticOmp<true, 256>(x, repeat);
-    flog(b1, "leidenLowmemStaticOmpMajorities", 256);
   }
 }
 
