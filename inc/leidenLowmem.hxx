@@ -491,10 +491,26 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
         if (p==1) t1 = timeNow();
         bool isFirst = p==0;
         int m = 0;
+        if (DEBUG) {
+          size_t DC = 0, NC = 0, DX = 0, NX = 0;
+          vector<K> xcom = ucom;
+          if (isFirst) { DC = countValue(communitiesDisconnectedOmp(x, ucom), char(1)); NC = communities(x, ucom).size(); }
+          else         { DC = countValue(communitiesDisconnectedOmp(y, vcom), char(1)); NC = communities(y, vcom).size(); }
+          DX = countValue(communitiesDisconnectedOmp(x, xcom), char(1)); NX = communities(x, xcom).size();
+          printf("LMB%02d: %zu/%zu communities disconnected : %zu/%zu communities disconnected in X\n", p, DC, NC, DX, NX);
+        }
         tl += measureDuration([&]() {
           if (isFirst) m += leidenLowmemMoveOmpW<false, MULTI>(ucom, ctot, vaff, mcs, mws, x, vcob, utot, M, R, L, fc, fa);
           else         m += leidenLowmemMoveOmpW<false, MULTI>(vcom, ctot, vaff, mcs, mws, y, vcob, vtot, M, R, L, fc);
         });
+        if (DEBUG) {
+          size_t DC = 0, NC = 0, DX = 0, NX = 0;
+          vector<K> xcom = ucom; if (!isFirst) leidenLookupCommunitiesOmpU(xcom, vcom);
+          if (isFirst) { DC = countValue(communitiesDisconnectedOmp(x, ucom), char(1)); NC = communities(x, ucom).size(); }
+          else         { DC = countValue(communitiesDisconnectedOmp(y, vcom), char(1)); NC = communities(y, vcom).size(); }
+          DX = countValue(communitiesDisconnectedOmp(x, xcom), char(1)); NX = communities(x, xcom).size();
+          printf("LME%02d: %zu/%zu communities disconnected : %zu/%zu communities disconnected in X\n", p, DC, NC, DX, NX);
+        }
         tr += measureDuration([&]() {
           if (isFirst) copyValuesOmpW(vcob.data(), ucom.data(), x.span());  // swap(vcob, ucom);
           else         copyValuesOmpW(vcob.data(), vcom.data(), y.span());  // swap(vcob, vcom);
@@ -505,6 +521,14 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
           if (isFirst) m += leidenLowmemMoveOmpW<true, MULTI>(ucom, ctot, vaff, mcs, mws, x, vcob, utot, M, R, L, fc);
           else         m += leidenLowmemMoveOmpW<true, MULTI>(vcom, ctot, vaff, mcs, mws, y, vcob, vtot, M, R, L, fc);
         });
+        if (DEBUG) {
+          size_t DC = 0, NC = 0, DX = 0, NX = 0;
+          vector<K> xcom = ucom; if (!isFirst) leidenLookupCommunitiesOmpU(xcom, vcom);
+          if (isFirst) { DC = countValue(communitiesDisconnectedOmp(x, ucom), char(1)); NC = communities(x, ucom).size(); }
+          else         { DC = countValue(communitiesDisconnectedOmp(y, vcom), char(1)); NC = communities(y, vcom).size(); }
+          DX = countValue(communitiesDisconnectedOmp(x, xcom), char(1)); NX = communities(x, xcom).size();
+          printf("REE%02d: %zu/%zu communities disconnected : %zu/%zu communities disconnected in X\n", p, DC, NC, DX, NX);
+        }
         l += max(m, 1); ++p;
         if (m<=1 || p>=P) break;
         size_t GN = isFirst? x.order() : y.order();
