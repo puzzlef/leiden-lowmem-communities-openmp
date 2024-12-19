@@ -383,9 +383,14 @@ inline void leidenLowmemAggregateEdgesOmpW(vector<K>& ydeg, vector<K>& yedg, vec
       K d = (*mcs[t])[i];
       V w = (*mws[t])[i];
       if (!w) continue;
-      csrAddEdgeU(ydeg, yedg, ywei, yoff, c, d, W(w));
+      csrAddEdgeOmpU<true>(ydeg, yedg, ywei, yoff, c, d, W(w));
+      csrAddEdgeOmpU<true>(ydeg, yedg, ywei, yoff, d, c, W(w));
     }
   }
+  // Ensure `ydeg` does not exceed bounds.
+  #pragma omp parallel for schedule(auto)
+  for (K c=0; c<C; ++c)
+    ydeg[c] = min(ydeg[c], K(yoff[c+1] - yoff[c]));
 }
 
 
