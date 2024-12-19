@@ -448,6 +448,9 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   vector<W> ctot(S);            // Total community weights (any pass)
   vector<K> bufk(T);            // Buffer for exclusive scan
   vector<size_t> bufs(T);       // Buffer for exclusive scan
+  vector<vector<K>*> vcs(T);    // Hashtable keys
+  vector<vector<W>*> vcout(T);  // Hashtable values
+  leidenAllocateHashtablesW(vcs, vcout, S);
   vector<array<K, SLOTS>*> mcs(T);  // Hashtable keys
   vector<array<V, SLOTS>*> mws(T);  // Hashtable values
   leidenLowmemAllocateHashtablesW(mcs, mws);
@@ -544,8 +547,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
           cv.respan(CN); z.respan(CN);
           if (isFirst) leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, x, ucom);
           else         leidenCommunityVerticesOmpW(cv.offsets, cv.degrees, cv.edgeKeys, bufk, y, vcom);
-          if (isFirst) leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, mcs, mws, x, ucom, cv.offsets, cv.edgeKeys);
-          else         leidenLowmemAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, mcs, mws, y, vcom, cv.offsets, cv.edgeKeys);
+          if (isFirst) leidenAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, x, ucom, cv.offsets, cv.edgeKeys);
+          else         leidenAggregateOmpW(z.offsets, z.degrees, z.edgeKeys, z.edgeValues, bufs, vcs, vcout, y, vcom, cv.offsets, cv.edgeKeys);
         });
         swap(y, z);
         // fillValueOmpU(vcob.data(), CN, K());
