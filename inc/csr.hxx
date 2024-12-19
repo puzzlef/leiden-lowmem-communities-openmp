@@ -25,6 +25,47 @@ inline K csrDegree(const vector<O>& offsets, K u) {
 
 
 
+#pragma region HAS EDGE
+/**
+ * Check if an edge exists in the graph.
+ * @param offsets offsets of the outgoing edges of vertices
+ * @param edgeKeys vertex ids of the outgoing edges of each vertex
+ * @param u source vertex id
+ * @param v target vertex id
+ * @returns true if edge exists, false otherwise
+ */
+template <class O, class K>
+inline bool csrHasEdge(const vector<O>& offsets, const vector<K>& edgeKeys, K u, K v) {
+  O i = offsets[u];
+  O I = offsets[u+1];
+  for (; i<I; ++i)
+    if (edgeKeys[i]==v) return true;
+  return false;
+}
+
+
+/**
+ * Check if an edge exists in the graph.
+ * @param offsets offsets of the outgoing edges of vertices
+ * @param degrees degree of each vertex
+ * @param edgeKeys vertex ids of the outgoing edges of each vertex
+ * @param u source vertex id
+ * @param v target vertex id
+ * @returns true if edge exists, false otherwise
+ */
+template <class O, class K>
+inline bool csrHasEdge(const vector<O>& offsets, const vector<K>& degrees, const vector<K>& edgeKeys, K u, K v) {
+  O i = offsets[u];
+  O I = offsets[u] + degrees[u];
+  for (; i<I; ++i)
+    if (edgeKeys[i]==v) return true;
+  return false;
+}
+#pragma endregion
+
+
+
+
 #pragma region FOREACH
 /**
  * Iterate over the target vertex ids of a source vertex in the graph.
@@ -340,6 +381,7 @@ inline void csrClearOmpW(vector<O>& offsets, vector<K>& degrees) {
 
 /**
  * Add an edge to the graph.
+ * @tparam CHECK check if edge already exists?
  * @param degrees degree of each vertex
  * @param edgeKeys vertex ids of the outgoing edges of each vertex
  * @param offsets offsets of the outgoing edges of vertices
@@ -347,8 +389,9 @@ inline void csrClearOmpW(vector<O>& offsets, vector<K>& degrees) {
  * @param v target vertex id
  * @note Does not check if the edge already exists, or is there is available space.
  */
-template <class O, class K>
+template <bool CHECK=false, class O, class K>
 inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, const vector<O>& offsets, K u, K v) {
+  if (CHECK && csrHasEdge(offsets, degrees, edgeKeys, u, v)) return;
   O n = degrees[u]++;
   O i = offsets[u] + n;
   edgeKeys[i] = v;
@@ -357,6 +400,7 @@ inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, const vector<O>
 #ifdef OPENMP
 /**
  * Add an edge to the graph.
+ * @tparam CHECK check if edge already exists?
  * @param degrees degree of each vertex
  * @param edgeKeys vertex ids of the outgoing edges of each vertex
  * @param offsets offsets of the outgoing edges of vertices
@@ -364,12 +408,14 @@ inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, const vector<O>
  * @param v target vertex id
  * @note Does not check if the edge already exists, or is there is available space.
  */
-template <class O, class K>
+template <bool CHECK=false, class O, class K>
 inline void csrAddEdgeOmpU(vector<K>& degrees, vector<K>& edgeKeys, const vector<O>& offsets, K u, K v) {
+  if (CHECK && csrHasEdge(offsets, degrees, edgeKeys, u, v)) return;
   O n = 0;
   #pragma omp atomic capture
   { n = degrees[u]; ++degrees[u]; }
   O i = offsets[u] + n;
+  if (CHECK && offsets[u+1]<=i) return;  // Check if there is available space.
   edgeKeys[i] = v;
 }
 #endif
@@ -377,6 +423,7 @@ inline void csrAddEdgeOmpU(vector<K>& degrees, vector<K>& edgeKeys, const vector
 
 /**
  * Add a weighted edge to the graph.
+ * @tparam CHECK check if edge already exists?
  * @param degrees degree of each vertex
  * @param edgeKeys vertex ids of the outgoing edges of each vertex
  * @param edgeValues edge values of the outgoing edges of each vertex
@@ -386,8 +433,9 @@ inline void csrAddEdgeOmpU(vector<K>& degrees, vector<K>& edgeKeys, const vector
  * @param w associated weight of the edge
  * @note Does not check if the edge already exists, or is there is available space.
  */
-template <class O, class K, class E>
+template <bool CHECK=false, class O, class K, class E>
 inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, vector<E>& edgeValues, const vector<O>& offsets, K u, K v, E w) {
+  if (CHECK && csrHasEdge(offsets, degrees, edgeKeys, u, v)) return;
   O n = degrees[u]++;
   O i = offsets[u] + n;
   edgeKeys[i]   = v;
@@ -397,6 +445,7 @@ inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, vector<E>& edge
 #ifdef OPENMP
 /**
  * Add a weighted edge to the graph.
+ * @tparam CHECK check if edge already exists?
  * @param degrees degree of each vertex
  * @param edgeKeys vertex ids of the outgoing edges of each vertex
  * @param edgeValues edge values of the outgoing edges of each vertex
@@ -406,12 +455,14 @@ inline void csrAddEdgeU(vector<K>& degrees, vector<K>& edgeKeys, vector<E>& edge
  * @param w associated weight of the edge
  * @note Does not check if the edge already exists, or is there is available space.
  */
-template <class O, class K, class E>
+template <bool CHECK=false, class O, class K, class E>
 inline void csrAddEdgeOmpU(vector<K>& degrees, vector<K>& edgeKeys, vector<E>& edgeValues, const vector<O>& offsets, K u, K v, E w) {
+  if (CHECK && csrHasEdge(offsets, degrees, edgeKeys, u, v)) return;
   O n = 0;
   #pragma omp atomic capture
   { n = degrees[u]; ++degrees[u]; }
   O i = offsets[u] + n;
+  if (CHECK && offsets[u+1]<=i) return;  // Check if there is available space.
   edgeKeys[i]   = v;
   edgeValues[i] = w;
 }
