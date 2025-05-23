@@ -52,9 +52,9 @@ void runExperiment(const G& x) {
   // Follow a specific result logging format, which can be easily parsed later.
   auto flog = [&](const auto& ans, const char *technique, size_t numSlots=0) {
     printf(
-      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %.3e slots, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
+      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms firstpass, %09.1fms locmove, %09.1fms refine, %09.1fms aggr, %09.4fGB memory, %.3e slots, %04d iters, %03d passes, %01.9f modularity, %zu/%zu disconnected} %s\n",
       ans.time, ans.markingTime, ans.initializationTime, ans.firstPassTime, ans.localMoveTime, ans.refinementTime, ans.aggregationTime,
-      double(numSlots), ans.iterations, ans.passes, getModularity(x, ans, M),
+      ans.memory, double(numSlots), ans.iterations, ans.passes, getModularity(x, ans, M),
       countValue(communitiesDisconnectedOmp(x, ans.membership), char(1)),
       communities(x, ans.membership).size(), technique
     );
@@ -68,6 +68,11 @@ void runExperiment(const G& x) {
   {
     auto b1 = leidenLowmemStaticOmp(x, {repeat});
     flog(b1, "leidenLowmemStaticOmpMajorities", 64);
+  }
+  // Get community memberships on original graph (low memory).
+  {
+    auto b2 = leidenLowmemStaticOmp<false, 1>(x, {repeat});
+    flog(b2, "leidenLowmemStaticOmpMajority", 1);
   }
 }
 

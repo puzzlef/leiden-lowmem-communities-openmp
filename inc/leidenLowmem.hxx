@@ -444,6 +444,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   size_t X = x.size();
   size_t S = x.span();
   double M = edgeWeightOmp(x)/2;
+  // Measure initial memory usage.
+  float m0 = measureMemoryUsage();
   // Allocate buffers.
   int    T = omp_get_max_threads();
   vector<B> vaff(S);            // Affected vertex flag (any pass)
@@ -461,6 +463,8 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
   DiGraphCsr<K, None, None, K> cv(S, S);  // CSR for community vertices
   DiGraphCsr<K, None, W> y(S, Y);         // CSR for aggregated graph (input);  y(S, X)
   DiGraphCsr<K, None, W> z(S, Z);         // CSR for aggregated graph (output); z(S, X)
+  // Measure memory usage after allocation.
+  float m1 = measureMemoryUsage();
   // Perform Leiden algorithm.
   float tm = 0, ti = 0, tp = 0, tl = 0, tr = 0, ta = 0;  // Time spent in different phases
   float t  = measureDurationMarked([&](auto mark) {
@@ -545,7 +549,7 @@ inline auto leidenLowmemInvokeOmp(const G& x, const LeidenOptions& o, FI fi, FM 
     });
   }, o.repeat);
   leidenLowmemFreeHashtablesW(mcs, mws);
-  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat);
+  return LeidenResult<K>(ucom, utot, ctot, l, p, t, tm/o.repeat, ti/o.repeat, tp/o.repeat, tl/o.repeat, tr/o.repeat, ta/o.repeat, m1-m0);
 }
 #pragma endregion
 

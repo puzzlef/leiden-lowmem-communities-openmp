@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdint>
+#include <cstring>
+#include <cstdio>
 #include <utility>
 #include <chrono>
 #ifdef MPI
@@ -9,6 +12,7 @@ using std::pair;
 using std::chrono::microseconds;
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
+using std::fopen;
 
 
 
@@ -183,6 +187,28 @@ inline float measureDurationMarkedMpi(F fn, int N=1) {
   return total/N;
 }
 #endif
+#pragma endregion
+
+
+
+
+#pragma region MEASURE MEMORY USAGE
+/**
+ * Measure the memory usage of the current process.
+ * @returns memory usage in gigabytes
+ */
+inline float measureMemoryUsage() {
+  char buf[128];
+  FILE *file = fopen("/proc/self/status", "r");
+  size_t rss = 0;
+  while  (fgets(buf, 128, file)) {
+    if (strncmp(buf, "VmRSS:", 6) != 0) continue;
+    if (sscanf (buf, "VmRSS: %ld kB", &rss) != 1) { rss = 0; break; }
+    break;
+  }
+  fclose(file);
+  return rss / (1024.0f * 1024.0f);
+}
 #pragma endregion
 
 
